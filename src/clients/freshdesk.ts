@@ -62,12 +62,10 @@ export default class FreshdeskClient {
   listContacts = async (): Promise<AxiosResponse<any>> =>
     this.client.get(`contacts`);
 
-  findContactByUsername = async (
-    username: string
+  findContactByEmail = async (
+    email: string
   ): Promise<FreshDeskContactType | undefined> => {
-    return this.client.get(
-      `search/contacts?query="email:'${username}@fakemail.com'"`
-    );
+    return this.client.get(`search/contacts?query="email:'${email}'"`);
   };
 
   createContact = async (

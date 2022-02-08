@@ -4,6 +4,7 @@ import GitHubClient, { GithubUserType } from "../clients/github";
 import FreshdeskClient, { FreshDeskContactType } from "../clients/freshdesk";
 import * as inquirer from "inquirer";
 import { doApiAction, showUser, toFreshdeskUser } from "../helper";
+import { gitUser } from "../../test/helpers/mockData";
 
 export default class Migrate extends Command {
   static description = "Migrate user from Github to Freshdesk";
@@ -85,7 +86,8 @@ export default class Migrate extends Command {
    * Gets the username and starts the migration process
    * */
   async promptAndExecute(username?: string) {
-    if (!this.githubClient || !this.freshdeskClient) return; //Cant happen
+    if (!this.githubClient || !this.freshdeskClient)
+      throw "Something went wrong"; //Cant happen
 
     // Ask user for username to migrate from github if not provided already
     let githubUsername = username;
@@ -105,23 +107,28 @@ export default class Migrate extends Command {
       githubUsername = usernameInput;
     }
 
-    try {// Exception would be 404, which means user was not found. We dont handle other quirks, just restart process
+    try {
+      // Exception would be 404, which means user was not found. We dont handle other quirks, just restart process
       const { data: githubUser }: { data: GithubUserType } = await doApiAction(
         this.githubClient.getUser,
         `Fetching user ${githubUsername} from GITHUB`,
         [githubUsername]
       );
 
-      try {// Assume 404 which means we dont have user already and we try to update. Other quirks are not handled
-        // Find contact by username in freshdesk
-        const {
-          data: { results },
-        }: { data: { results: FreshDeskContactType[] } } = await doApiAction(
-          this.freshdeskClient.findContactByUsername,
+      // Find contact by username in freshdesk
+
+      const {
+        data: { results },
+        status,
+      }: { data: { results: FreshDeskContactType[] }; status: any } =
+        await doApiAction(
+          this.freshdeskClient.findContactByEmail,
           "Looking up user in Freshdesk",
-          [githubUser.login]
+          [githubUser.email ?? githubUser.login + "@fakemail.com"]
         );
+      if (results.length) {
         // UPDATE if user exists
+
         const freshdeskUser = toFreshdeskUser(githubUser);
         // these cant be used in update
         delete freshdeskUser.email;
@@ -134,19 +141,19 @@ export default class Migrate extends Command {
         );
         // Show some data
         showUser(freshdeskUser);
-      } catch (e: any) {
+        this.log("Update done!");
+      } else {
         //CREATE new user since we found none
-        try {//Since I dont know fully what can break, we leave this as trace in case something is missing in data from github
-          await doApiAction(
-            this.freshdeskClient.createContact,
-            "Creating Freshdesk account since no existing user was found",
-            [toFreshdeskUser(githubUser)]
-          );
 
-          showUser(toFreshdeskUser(githubUser));
-        } catch (e: any) {
-          console.log(e.response.data);
-        }
+        //Since I dont know fully what can break, we leave this as trace in case something is missing in data from github
+        await doApiAction(
+          this.freshdeskClient.createContact,
+          "Creating Freshdesk account since no existing user was found",
+          [toFreshdeskUser(githubUser)]
+        );
+
+        showUser(toFreshdeskUser(githubUser));
+        this.log("Creation done!");
       }
     } catch (e: any) {
       if (e.response.status === 404) {
