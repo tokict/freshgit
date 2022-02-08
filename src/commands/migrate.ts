@@ -4,7 +4,6 @@ import GitHubClient, { GithubUserType } from "../clients/github";
 import FreshdeskClient, { FreshDeskContactType } from "../clients/freshdesk";
 import * as inquirer from "inquirer";
 import { doApiAction, showUser, toFreshdeskUser } from "../helper";
-import { gitUser } from "../../test/helpers/mockData";
 
 export default class Migrate extends Command {
   static description = "Migrate user from Github to Freshdesk";
